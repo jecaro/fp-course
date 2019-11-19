@@ -87,12 +87,15 @@ printFile ::
   -> IO ()
 printFile path content = putStrLn $ "============ " ++ path ++ "\n" ++ content
 
+sequenceMap :: Applicative k => (a -> k b) -> List a -> k (List b)
+sequenceMap f = sequence . map f
+
 -- Given a list of (file name and file contents), print each.
 -- Use @printFile@.
 printFiles ::
   List (FilePath, Chars)
   -> IO ()
-printFiles = void . sequence . map (uncurry printFile)
+printFiles = void . sequenceMap (uncurry printFile)
 
 -- Given a file name, return (file name and file contents).
 -- Use @readFile@.
@@ -106,7 +109,7 @@ getFile filePath = (,) filePath <$> readFile filePath
 getFiles ::
   List FilePath
   -> IO (List (FilePath, Chars))
-getFiles= sequence . map getFile
+getFiles= sequenceMap getFile
 
 -- Given a file name, read it and for each line in that file, read and print contents of each.
 -- Use @getFiles@, @lines@, and @printFiles@.
