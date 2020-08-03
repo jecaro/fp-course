@@ -38,7 +38,7 @@ exec ::
   State s a
   -> s
   -> s
-exec state = snd . runState state
+exec (State sa) = snd . sa
 
 -- | Run the `State` seeded with `s` and retrieve the resulting value.
 --
@@ -47,7 +47,7 @@ eval ::
   State s a
   -> s
   -> a
-eval state = fst . runState state
+eval (State sa) = fst . sa
 
 -- | A `State` where the state also distributes into the produced value.
 --
@@ -55,7 +55,7 @@ eval state = fst . runState state
 -- (0,0)
 get ::
   State s s
-get = State (\v -> (v, v))
+get = State (\s -> (s, s))
 
 -- | A `State` where the resulting state is seeded with the given value.
 --
@@ -64,7 +64,7 @@ get = State (\v -> (v, v))
 put ::
   s
   -> State s ()
-put v = State (const ((), v))
+put s = State (const ((), s))
 
 -- | Implement the `Functor` instance for `State s`.
 --
@@ -75,11 +75,11 @@ instance Functor (State s) where
     (a -> b)
     -> State s a
     -> State s b
-  (<$>) f state = State run
+  (<$>) fab (State sa) = State run
       where
         run s =
-          let (v, s') = runState state s
-           in (f v, s')
+          let (a, s') = sa s
+           in (fab a, s')
 
 -- | Implement the `Applicative` instance for `State s`.
 --
@@ -95,17 +95,17 @@ instance Applicative (State s) where
   pure ::
     a
     -> State s a
-  pure v = State ((,) v)
+  pure a = State ((,) a)
   (<*>) ::
      State s (a -> b) ->
      State s a ->
      State s b
-  (<*>) statef statev = State run
+  (<*>) (State sab) (State sa) = State run
       where
         run s =
-          let (f, s') = runState statef s
-              (v, s'') = runState statev s'
-           in (f v, s'')
+          let (fab, s') = sab s
+              (a, s'') = sa s'
+           in (fab a, s'')
 
 -- | Implement the `Monad` instance for `State s`.
 --
@@ -122,12 +122,12 @@ instance Monad (State s) where
     (a -> State s b)
     -> State s a
     -> State s b
-  (=<<) f statea = State run
+  (=<<) fasb (State sa) = State run
       where
         run s =
-            let (v, s') = runState statea s
-                stateb = f v
-             in runState stateb s'
+            let (a, s') = sa s
+                (State sb) = fasb a
+             in sb s'
 
 -- | Find the first element in a `List` that satisfies a given predicate.
 -- It is possible that no element is found, hence an `Optional` result.
