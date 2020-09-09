@@ -187,7 +187,7 @@ data Digit =
   | Seven
   | Eight
   | Nine
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 showDigit ::
   Digit
@@ -218,7 +218,7 @@ data Digit3 =
   D1 Digit
   | D2 Digit Digit
   | D3 Digit Digit Digit
-  deriving Eq
+  deriving (Eq, Show)
 
 -- Possibly convert a character to a digit.
 fromChar ::
@@ -320,8 +320,107 @@ fromChar _ =
 --
 -- >>> dollars "456789123456789012345678901234567890123456789012345678901234567890.12"
 -- "four hundred and fifty-six vigintillion seven hundred and eighty-nine novemdecillion one hundred and twenty-three octodecillion four hundred and fifty-six septendecillion seven hundred and eighty-nine sexdecillion twelve quindecillion three hundred and forty-five quattuordecillion six hundred and seventy-eight tredecillion nine hundred and one duodecillion two hundred and thirty-four undecillion five hundred and sixty-seven decillion eight hundred and ninety nonillion one hundred and twenty-three octillion four hundred and fifty-six septillion seven hundred and eighty-nine sextillion twelve quintillion three hundred and forty-five quadrillion six hundred and seventy-eight trillion nine hundred and one billion two hundred and thirty-four million five hundred and sixty-seven thousand eight hundred and ninety dollars and twelve cents"
+
+ten :: Digit -> Chars
+ten Zero = Nil
+ten One = "ten"
+ten Two = "twenty"
+ten Three = "thirty"
+ten Four = "forty"
+ten Five = "fifty"
+ten Six = "sixty"
+ten Seven = "seventy"
+ten Eight = "eighty"
+ten Nine = "ninety"
+
+showDigit3 :: Digit3 -> Chars
+showDigit3 (D1 d) = showDigit d
+showDigit3 (D2 One Zero) = "ten"
+showDigit3 (D2 One One) = "eleven"
+showDigit3 (D2 One Two) = "twelve"
+showDigit3 (D2 One Three) = "thirteen"
+showDigit3 (D2 One Four) = "fourteen"
+showDigit3 (D2 One Five) = "fifteen"
+showDigit3 (D2 One Six) = "sixteen"
+showDigit3 (D2 One Seven) = "seventeen"
+showDigit3 (D2 One Eight) = "eightteen"
+showDigit3 (D2 One Nine) = "nineteen"
+showDigit3 (D2 d1 Zero) = ten d1
+showDigit3 (D2 d1 d2) = ten d1 ++ '-' :. showDigit d2
+showDigit3 (D3 d1 Zero Zero) = showDigit d1 ++ " hundred"
+showDigit3 (D3 d1 Zero d3) = showDigit d1 ++ " hundred and " ++ showDigit d3
+showDigit3 (D3 d1 d2 Zero) = showDigit d1 ++ " hundred and " ++ ten d2
+showDigit3 (D3 d1 d2 d3) = showDigit d1 ++ " hundred and " ++ ten d2 ++ '-' :. showDigit d3
+
 dollars ::
   Chars
   -> Chars
-dollars =
-  error "todo: Course.Cheque#dollars"
+dollars string =
+      -- Break the string in two
+  let (integerString, decimalString) = break (== '.') string
+
+      -- Convert a string to a list of digits
+      stringToDigits :: Chars -> List Digit
+      stringToDigits = listOptional fromChar
+
+      -- Remove trailing zeros from a digit
+      normalize :: Digit3 -> Digit3
+      normalize (D3 Zero c1 c2) = normalize (D2 c1 c2)
+      normalize (D2 Zero c) = D1 c
+      normalize d = d
+
+      -- Group a list of digit in 'Digit3'
+      digitsToDigit3 :: List Digit -> List Digit3
+      digitsToDigit3 digits =
+        let f :: Digit -> List Digit3 -> List Digit3
+            f d ((D1 d1) :. ds) = D2 d d1 :. ds
+            f d ((D2 d1 d2) :. ds) = D3 d d1 d2 :. ds
+            f d ds = D1 d :. ds
+         in normalize <$> foldRight f Nil digits
+
+      -- The decimal part in 'Digit3' form
+      decimals :: Digit3
+      decimals =
+        case stringToDigits decimalString of
+          Zero :. Nil -> D1 Zero
+          c1 :. Nil -> D2 c1 Zero
+          Zero :. c :. Nil -> D1 c
+          Zero :. Zero :. _ -> D1 Zero
+          c1 :. c2 :. _ -> D2 c1 c2
+          _ -> D1 Zero
+
+      -- The integer part as a list of 'Digit'
+      integers :: List Digit3
+      integers =
+        case digitsToDigit3 $ stringToDigits integerString of
+          Nil -> D1 Zero :. Nil
+          xs -> xs
+
+      -- The group of digits along its power of three
+      integersAndPowerOf3 :: List (Digit3, Chars)
+      integersAndPowerOf3 = zip integers (reverse $ take (length integers) illion)
+
+      -- Convert it to a string
+      showDigitWithPowerOf3 :: (Digit3, List Char) -> List Char
+      showDigitWithPowerOf3 (d3, "") = showDigit3 d3 ++ " "
+      showDigitWithPowerOf3 (D1 Zero, _) = ""
+      showDigitWithPowerOf3 (d3, powerOf3) = showDigit3 d3 ++ " " ++ powerOf3 ++ " "
+
+      -- Eventual terminating 's' for one 'Digit3'
+      addSForOneDigit3 :: Digit3 -> Chars
+      addSForOneDigit3 (D1 One) = ""
+      addSForOneDigit3 _ = "s"
+
+      -- Same for a list
+      addSForListOfDigits3 :: List Digit3 -> Chars
+      addSForListOfDigits3 l =
+        case l of
+          d :. Nil -> addSForOneDigit3 d
+          Nil -> ""
+          _ -> "s"
+
+      -- Output the result
+   in flatMap showDigitWithPowerOf3 integersAndPowerOf3
+      ++ "dollar" ++ addSForListOfDigits3 integers
+      ++ " and "
+      ++ showDigit3 decimals ++ " cent" ++ addSForOneDigit3 decimals
