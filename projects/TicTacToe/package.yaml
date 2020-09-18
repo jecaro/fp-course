@@ -19,9 +19,17 @@ copyright:           "MIT"
 
 dependencies:
 - base >= 4.7 && < 5
+- microlens
 
 library:
   source-dirs: src
+  ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-signatures
+  - -Wredundant-constraints
 
 executables:
   TicTacToe-exe:
@@ -31,6 +39,12 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
+    - -Wcompat
+    - -Wincomplete-record-updates
+    - -Wincomplete-uni-patterns
+    - -Wmissing-signatures
+    - -Wredundant-constraints
     dependencies:
     - TicTacToe
 
@@ -42,5 +56,11 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
+    - -Wcompat
+    - -Wincomplete-record-updates
+    - -Wincomplete-uni-patterns
+    - -Wmissing-signatures
+    - -Wredundant-constraints
     dependencies:
     - TicTacToe
