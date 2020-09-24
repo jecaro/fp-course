@@ -1,80 +1,48 @@
-{-# LANGUAGE RankNTypes #-}
+module TicTacToe
+    ( Game,
+      Player (..),
+      State (..),
+      gaPlayer,
+      isDraw,
+      move,
+      mkGame,
+      nextPlayer,
+      playerAt,
+      state,
+      render,
+      takeBack,
+      whoWon,
+    )
+where
 
-module TicTacToe where
-
+import Board (Board, col, diag1, diag2, empty, row, winnerOnRow)
+import qualified Board
 import Control.Monad (join)
+import Coordinate (Coordinate (..), lens)
 import Data.List (elemIndex, find)
 import Data.Maybe (isJust, isNothing)
-import Lens.Micro ((&), (?~), Lens, (^.), _1, _2, _3)
-import Lens.Micro.Internal (Field1, Field2, Field3)
-
-data Player = Cross | Plus
-    deriving (Eq, Show)
-
-data Coordinates = One | Two | Three
-    deriving (Eq, Enum)
-
-data Position = MkPosition !Coordinates !Coordinates
-    deriving (Eq)
+import Lens.Micro ((&), (?~))
+import Player (Player (..), other)
+import Position (Position (..))
 
 data Game = MkGame
-    { gaFirstPlayer :: !Player,
+    { gaPlayer :: !Player,
       gaPositions :: ![Position]
     }
+    deriving (Show)
+
+data State = Draw | Playing | Finish Player
 
 data MoveError = GameIsFinished | PositionOccupied
-
-type Element = Maybe Player
-
-type ThreeElements = (Element, Element, Element)
-
-type Board = (ThreeElements, ThreeElements, ThreeElements)
-
-empty :: Board
-empty =
-    let emptyLine = (Nothing, Nothing, Nothing)
-     in (emptyLine, emptyLine, emptyLine)
 
 fill :: Game -> Board
 fill (MkGame player positions) =
     let f :: Position -> (Board, Player) -> (Board, Player)
         f (MkPosition x y) (b, p) =
-            let b' = b & coordLens x . coordLens y ?~ p
+            let b' = b & lens y . lens x ?~ p
                 p' = other p
              in (b', p')
      in fst $ foldr f (empty, player) positions
-
-other :: Player -> Player
-other Cross = Plus
-other Plus = Cross
-
-coordLens ::
-    (Field1 s t a b, Field2 s t a b, Field3 s t a b) =>
-    Coordinates ->
-    Lens s t a b
-coordLens One = _1
-coordLens Two = _2
-coordLens Three = _3
-
-row :: Coordinates -> Board -> ThreeElements
-row coordinate board = board ^. coordLens coordinate
-
-col :: Coordinates -> Board -> ThreeElements
-col coordinates board =
-    let x1 = board ^. _1 . coordLens coordinates
-        x2 = board ^. _2 . coordLens coordinates
-        x3 = board ^. _3 . coordLens coordinates
-     in (x1, x2, x3)
-
-diag1 :: Board -> ThreeElements
-diag1 board = (board ^. _1 . _1, board ^. _2 . _2, board ^. _3 . _3)
-
-diag2 :: Board -> ThreeElements
-diag2 board = (board ^. _1 . _3, board ^. _2 . _2, board ^. _3 . _1)
-
-winnerOnRow :: ThreeElements -> Maybe Player
-winnerOnRow (Just p1, Just p2, Just p3) | p1 == p2 && p1 == p3 = Just p1
-winnerOnRow _ = Nothing
 
 whoWon :: Game -> Maybe Player
 whoWon game =
@@ -86,6 +54,12 @@ whoWon game =
 isDraw :: Game -> Bool
 isDraw game@(MkGame _ positions) = isNothing (whoWon game) && length positions == 9
 
+state :: Game -> State
+state game
+    | isDraw game = Draw
+    | otherwise =
+        maybe Playing Finish (whoWon game)
+
 playerAt :: Game -> Position -> Maybe Player
 playerAt (MkGame player positions) position = do
     idx <- elemIndex position positions
@@ -94,11 +68,23 @@ playerAt (MkGame player positions) position = do
         else pure (other player)
 
 takeBack :: Game -> Maybe Game
-takeBack game@(MkGame _ (_ : ps)) = Just $ game {gaPositions = ps}
+takeBack game@(MkGame _ (_ : ps)) = Just game {gaPositions = ps}
 takeBack (MkGame _ []) = Nothing
+
+mkGame :: Player -> Game
+mkGame player = MkGame player []
+
+render :: Game -> String
+render = Board.render . fill
 
 move :: Game -> Position -> Either MoveError Game
 move game@(MkGame _ positions) position
     | isJust (whoWon game) || isDraw game = Left GameIsFinished
     | position `elem` positions = Left PositionOccupied
-    | otherwise = Right $ game {gaPositions = position : positions}
+    | otherwise = Right game {gaPositions = position : positions}
+
+nextPlayer :: Game -> Player
+nextPlayer (MkGame player positions) =
+    if even (length positions)
+        then player
+        else other player
