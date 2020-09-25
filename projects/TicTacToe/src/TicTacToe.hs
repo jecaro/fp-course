@@ -1,5 +1,6 @@
 module TicTacToe
     ( Game,
+      Error (..),
       Player (..),
       State (..),
       gaPlayer,
@@ -33,7 +34,8 @@ data Game = MkGame
 
 data State = Draw | Playing | Finish Player
 
-data MoveError = GameIsFinished | PositionOccupied
+data Error = GameIsFinished | PositionOccupied Position
+    deriving (Show)
 
 fill :: Game -> Board
 fill (MkGame player positions) =
@@ -77,10 +79,10 @@ mkGame player = MkGame player []
 render :: Game -> String
 render = Board.render . fill
 
-move :: Game -> Position -> Either MoveError Game
+move :: Game -> Position -> Either Error Game
 move game@(MkGame _ positions) position
     | isJust (whoWon game) || isDraw game = Left GameIsFinished
-    | position `elem` positions = Left PositionOccupied
+    | position `elem` positions = Left $ PositionOccupied position
     | otherwise = Right game {gaPositions = position : positions}
 
 nextPlayer :: Game -> Player

@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Coordinate (Coordinate (..), lens, parser) where
+module Coordinate (Coordinate (..), lens, render, parser) where
 
 import Lens.Micro (Lens, _1, _2, _3)
 import Lens.Micro.Internal (Field1, Field2, Field3)
@@ -21,3 +21,8 @@ lens ::
 lens One = _1
 lens Two = _2
 lens Three = _3
+
+render :: Coordinate -> String
+render One = "1"
+render Two = "2"
+render Three = "3"

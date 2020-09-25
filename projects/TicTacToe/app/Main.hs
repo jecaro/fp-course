@@ -1,5 +1,8 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Main where
 
+import Control.Monad.Except (liftEither, runExcept, withExcept)
 import Options.Applicative
     ( (<**>),
       (<|>),
@@ -16,6 +19,7 @@ import Options.Applicative
     )
 import qualified Position
 import Text.Parsec (parse)
+import qualified Text.Parsec as Parsec (ParseError)
 import TicTacToe
     ( Game,
       Player (..),
@@ -23,9 +27,9 @@ import TicTacToe
       mkGame,
       move,
       nextPlayer,
-      render,
       state,
     )
+import qualified TicTacToe (Error (..), render)
 
 playerParser :: Parser Player
 playerParser =
@@ -38,23 +42,36 @@ opts =
         (playerParser <**> helper)
         (fullDesc <> progDesc "Start the TicTacToe game")
 
+data Error = EParsec Parsec.ParseError | ETicTacToe TicTacToe.Error
+
+render :: Error -> String
+render (EParsec err) = show err
+render (ETicTacToe TicTacToe.GameIsFinished) = "Game is finished"
+render (ETicTacToe (TicTacToe.PositionOccupied position)) =
+    "Position is occupied " <> Position.render position
+
 play :: Game -> IO ()
 play game = do
-    putStrLn $ render game
+    putStrLn $ TicTacToe.render game
     case state game of
         Draw -> putStrLn "Draw !"
         Finish p -> putStrLn $ "Winner is " <> show p
         Playing -> do
             putStrLn $ "Player " <> show (nextPlayer game)
             line <- getLine
-            let game' =
-                    case parse Position.parser "" line of
-                        Left _ -> game
-                        Right position ->
-                            case move game position of
-                                Left _ -> game
-                                Right g -> g
-            play game'
+            let gameOrError :: Either Error Game
+                gameOrError = runExcept $ do
+                    position <-
+                        withExcept EParsec
+                            $ liftEither
+                            $ parse Position.parser "" line
+                    withExcept ETicTacToe $ liftEither $ move game position
+            case gameOrError of
+                Left err -> do
+                    putStrLn $ "Error: " <> render err
+                    putStrLn "Try again"
+                    play game
+                Right game' -> play game'
 
 main :: IO ()
 main = do
