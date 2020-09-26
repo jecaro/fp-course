@@ -3,7 +3,6 @@ module TicTacToe
       Error (..),
       Player (..),
       State (..),
-      gaPlayer,
       isDraw,
       move,
       mkGame,
@@ -30,12 +29,13 @@ data Game = MkGame
     { gaPlayer :: !Player,
       gaPositions :: ![Position]
     }
-    deriving (Show)
+    deriving (Eq, Show)
 
 data State = Draw | Playing | Finish Player
+    deriving (Eq, Show)
 
 data Error = GameIsFinished | PositionOccupied Position
-    deriving (Show)
+    deriving (Eq, Show)
 
 fill :: Game -> Board
 fill (MkGame player positions) =
