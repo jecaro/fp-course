@@ -40,8 +40,8 @@ data Error = GameIsFinished | PositionOccupied Position
 fill :: Game -> Board
 fill (MkGame player positions) =
     let f :: Position -> (Board, Player) -> (Board, Player)
-        f (MkPosition x y) (b, p) =
-            let b' = b & lens y . lens x ?~ p
+        f (MkPosition r c) (b, p) =
+            let b' = b & lens r . lens c ?~ p
                 p' = other p
              in (b', p')
      in fst $ foldr f (empty, player) positions
