@@ -19,11 +19,14 @@ copyright:           "MIT"
 
 dependencies:
 - base >= 4.7 && < 5
-- hspec
+- hedgehog
 - microlens
 - mtl
 - optparse-applicative
 - parsec
+- tasty
+- tasty-hedgehog
+- tasty-hspec
 
 library:
   source-dirs: src

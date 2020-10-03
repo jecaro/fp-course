@@ -1,9 +1,17 @@
-import Control.Monad (foldM)
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
+import Control.Monad (foldM, guard, void)
 import Coordinate (Coordinate (..))
+import Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 import Position (Position (..))
-import Test.Hspec (Spec, describe, hspec, it, shouldBe)
+import Test.Tasty
+import Test.Tasty.Hedgehog
+import Test.Tasty.Hspec (Spec, describe, it, shouldBe, testSpec)
 import TicTacToe
-    ( Error,
+    ( Error (..),
       Game,
       Player (..),
       State (..),
@@ -225,5 +233,111 @@ spec =
                     secondMove = flip move (MkPosition Two One) =<< firstMove
                  in takeBack <$> secondMove `shouldBe` Just <$> firstMove
 
+allCoordinates :: [Coordinate]
+allCoordinates = [minBound ..]
+
+allPositions :: [Position]
+allPositions = MkPosition <$> allCoordinates <*> allCoordinates
+
+genPosition :: Gen Position
+genPosition =
+    MkPosition <$> Gen.enumBounded <*> Gen.enumBounded
+
+genEmptyGame :: Gen Game
+genEmptyGame = mkGame <$> Gen.enumBounded
+
+-- | Return a random game along available positions
+genNonEmptyNonFinishedGame :: Gen (Game, [Position])
+genNonEmptyNonFinishedGame = do
+    empty <- genEmptyGame
+    allPositionsShuffled <- Gen.shuffle allPositions
+    n <- Gen.integral (Range.constantFrom 1 1 8)
+    let (played, remaining) = splitAt n allPositionsShuffled
+        gameOrError = foldM move empty played
+    case gameOrError of
+        Left _ -> Gen.discard
+        Right game -> do
+            guard (state game == Playing)
+            pure (game, remaining)
+
+prop_empty :: Property
+prop_empty =
+    property $ do
+        game <- forAll genEmptyGame
+        position <- forAll genPosition
+        let game' = move game position
+        void $ evalEither game'
+
+prop_fourMoves :: Property
+prop_fourMoves =
+    property $ do
+        game <- forAll genEmptyGame
+        positions <- forAll $ take 4 <$> Gen.shuffle allPositions
+        let gameOrError = foldM move game positions
+        void $ evalEither gameOrError
+
+prop_twice :: Property
+prop_twice =
+    property $ do
+        game <- forAll genEmptyGame
+        position <- forAll genPosition
+        let gameOrError = move game position
+        game' <- evalEither gameOrError
+        move game' position === Left (PositionOccupied position)
+
+prop_takeBackEmpty :: Property
+prop_takeBackEmpty =
+    property $ do
+        game <- forAll genEmptyGame
+        takeBack game === Nothing
+
+prop_takeBack :: Property
+prop_takeBack =
+    property $ do
+        (game, positions) <- forAll genNonEmptyNonFinishedGame
+        case positions of
+            [] -> discard
+            position : _ -> do
+                let gameOrError = move game position
+                (takeBack <$> gameOrError) === Right (Just game)
+
+prop_playerAt :: Property
+prop_playerAt =
+    property $ do
+        (game, positions) <- forAll genNonEmptyNonFinishedGame
+        case positions of
+            [] -> discard
+            position : _ -> do
+                (`playerAt` position) game === Nothing
+                let player = nextPlayer game
+                    gameOrError = move game position
+                ((`playerAt` position) <$> gameOrError) === Right (Just player)
+
+properties :: TestTree
+properties =
+    testGroup
+        "Properties"
+        [ testProperty
+              "Play on empty board"
+              prop_empty,
+          testProperty
+              "Play four moves"
+              prop_fourMoves,
+          testProperty
+              "Play twice the same position"
+              prop_twice,
+          testProperty
+              "Take back on empty board"
+              prop_takeBackEmpty,
+          testProperty
+              "Take back"
+              prop_takeBack,
+          testProperty
+              "Player at"
+              prop_playerAt
+        ]
+
 main :: IO ()
-main = hspec spec
+main = do
+    hspecTests <- testSpec "Unit tests" spec
+    defaultMain $ testGroup "Test suite" [hspecTests, properties]

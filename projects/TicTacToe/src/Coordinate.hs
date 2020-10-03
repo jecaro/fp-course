@@ -9,7 +9,7 @@ import Text.Parsec.Char (string)
 import Text.Parsec.String (Parser)
 
 data Coordinate = One | Two | Three
-    deriving (Eq, Enum, Show)
+    deriving (Bounded, Eq, Enum, Show)
 
 parser :: Parser Coordinate
 parser = One <$ string "1" <|> Two <$ string "2" <|> Three <$ string "3"

@@ -1,7 +1,7 @@
 module Player (Player (..), other, render) where
 
 data Player = Cross | Plus
-    deriving (Eq, Show)
+    deriving (Bounded, Enum, Eq, Show)
 
 other :: Player -> Player
 other Cross = Plus

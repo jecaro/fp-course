@@ -64,7 +64,7 @@ state game
 
 playerAt :: Game -> Position -> Maybe Player
 playerAt (MkGame player positions) position = do
-    idx <- elemIndex position positions
+    idx <- elemIndex position (reverse positions)
     if even idx
         then pure player
         else pure (other player)
